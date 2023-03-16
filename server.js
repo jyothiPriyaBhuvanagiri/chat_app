@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
+const chatMessage =require("./util/messages")
 
 const app = express();
 const server = http.createServer(app);
@@ -9,13 +10,15 @@ const io = socketIo(server);
 
 // to access the frontend we need a static folder we use express middleware express.static
 app.use(express.static(path.join(__dirname, "public")));
+const botName="bot"
+
 
 // handle new connections
 io.on("connection", socket => {
   console.log("A user connected");
 
   // emit a welcome message to the client
-  socket.emit("message", "Welcome to the chat");
+  socket.emit("message", chatMessage(botName , "Welcome to the chat"));
 
   // handle messages from the client
   socket.on("message", (message) => {
@@ -26,17 +29,17 @@ io.on("connection", socket => {
   });
 
   // broadcast when a user connects $$ for all the clients except the connecting one
-  socket.broadcast.emit("message", "A user has joined");
+  socket.broadcast.emit("message", chatMessage(botName, "A user has joined"));
 
   // handle disconnections
   socket.on("disconnect", () => {
     // emit a message to all clients when a user disconnects
-    io.emit("message", "A user has left the chat");
+    io.emit("message", chatMessage(botName, "A user has left the chat"));
   });
 
   // listen to the chat message
   socket.on("chatMessage", (msg) =>{
-    io.emit("message",msg)
+    io.emit("message", chatMessage("USER",msg))
   })
 });
 
