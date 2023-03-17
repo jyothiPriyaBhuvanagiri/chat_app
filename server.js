@@ -3,6 +3,7 @@ const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
 const chatMessage =require("./util/messages")
+const {userJoin, currentUser, getRoomUsers, userLeft} =require("./util/user")
 
 const app = express();
 const server = http.createServer(app);
@@ -17,30 +18,42 @@ const botName="bot"
 io.on("connection", socket => {
   console.log("A user connected");
 
-  // emit a welcome message to the client
-  socket.emit("message", chatMessage(botName , "Welcome to the chat"));
+  socket.on("joinRoom",({username, room}) => {
+    const user = userJoin(socket.id, username, room)
+    socket.join(user.room)
 
-  // handle messages from the client
-  socket.on("message", (message) => {
-    console.log(`Received message: ${message}`);
+    // emit a welcome message to the client
+    socket.emit("message", chatMessage(botName , "Welcome to the chat"));
 
-    // broadcast the message to all clients $$ and for the single client
-    io.emit("message", message);
-  });
+    // handle messages from the client
+    socket.on("message", (message) => {
+      console.log(`Received message: ${message}`);
 
-  // broadcast when a user connects $$ for all the clients except the connecting one
-  socket.broadcast.emit("message", chatMessage(botName, "A user has joined"));
+      // broadcast the message to all clients $$ and for the single client
+      io.emit("message", message);
+    });
 
-  // handle disconnections
-  socket.on("disconnect", () => {
-    // emit a message to all clients when a user disconnects
-    io.emit("message", chatMessage(botName, "A user has left the chat"));
-  });
+    // broadcast when a user connects $$ for all the clients except the connecting one
+    socket.broadcast.to(user.room).emit("message", chatMessage(botName, `${user.username} has joined`));
+
+      })
 
   // listen to the chat message
   socket.on("chatMessage", (msg) =>{
-    io.emit("message", chatMessage("USER",msg))
+
+    const user =currentUser(socket.id)
+    io.to(user.room).emit("message", chatMessage(`${user.username}`,msg))
   })
+  // handle disconnections
+  socket.on("disconnect", () => {
+    const user = userLeft(socket.id)
+
+    if(user){
+      // emit a message to all clients when a user disconnects
+      io.to(user.room).emit("message", chatMessage(botName, `${user.username} has left the room`));
+    }
+
+  });
 });
 
 const PORT = process.env.PORT || 3000;
